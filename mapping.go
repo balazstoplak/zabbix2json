@@ -82,3 +82,33 @@ func HostFlags(suppressed bool) int {
 	}
 	return flags
 }
+
+// BuildServices joins problems to their hostnames and produces nagios rows.
+func BuildServices(problems []Problem, hostByTrigger map[string]string, now int64) []Service {
+	totals := make(map[string]int, len(problems))
+	rows := make([]Service, 0, len(problems))
+	for _, p := range problems {
+		host := hostByTrigger[p.TriggerID]
+		totals[host]++
+		output := p.Opdata
+		if output == "" {
+			output = p.Name
+		}
+		rows = append(rows, Service{
+			EventID:         p.EventID,
+			Hostname:        host,
+			Service:         p.Name,
+			Status:          SeverityToStatus(p.Severity),
+			Flags:           ServiceFlags(p.Acknowledged, p.Suppressed),
+			HostFlags:       HostFlags(p.Suppressed),
+			LastStateChange: p.Clock,
+			DurationSecs:    now - p.Clock,
+			PluginOutput:    output,
+			HostAlive:       1,
+		})
+	}
+	for i := range rows {
+		rows[i].ServicesTotal = totals[rows[i].Hostname]
+	}
+	return rows
+}
