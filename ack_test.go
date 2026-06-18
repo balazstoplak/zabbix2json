@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,6 +73,54 @@ func TestHandleCmdNoMatchFails(t *testing.T) {
 	}
 	if len(c.ackCalls) != 0 {
 		t.Errorf("should not have called Acknowledge")
+	}
+}
+
+func TestHandleCmdHostnamesErrorIs502(t *testing.T) {
+	c := &fakeClient{
+		problems: []Problem{{EventID: "55", TriggerID: "t1", Name: "PING", Severity: 5, Clock: 100}},
+		hostErr:  context.DeadlineExceeded,
+	}
+	form := "cmd_typ=34&host=web01&service=PING&com_data=x"
+	req := httptest.NewRequest(http.MethodPost, "/cmd.cgi", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	testServer(c).handleCmd(rec, req)
+	if rec.Code != http.StatusBadGateway {
+		t.Errorf("want 502 on hostnames error, got %d", rec.Code)
+	}
+	if len(c.ackCalls) != 0 {
+		t.Error("should not have called Acknowledge")
+	}
+}
+
+func TestHandleCmdEmptyHostIs400(t *testing.T) {
+	c := &fakeClient{}
+	form := "cmd_typ=34&host=&service=PING&com_data=x"
+	req := httptest.NewRequest(http.MethodPost, "/cmd.cgi", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	testServer(c).handleCmd(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("want 400 on empty host, got %d", rec.Code)
+	}
+	if len(c.ackCalls) != 0 {
+		t.Error("should not have called Acknowledge")
+	}
+}
+
+func TestHandleCmdEmptyServiceIs400(t *testing.T) {
+	c := &fakeClient{}
+	form := "cmd_typ=34&host=web01&service=&com_data=x" // svc command requires service
+	req := httptest.NewRequest(http.MethodPost, "/cmd.cgi", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	testServer(c).handleCmd(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("want 400 on empty service for svc command, got %d", rec.Code)
 	}
 }
 

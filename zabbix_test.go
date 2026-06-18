@@ -89,6 +89,21 @@ func TestHTTPClientAcknowledgeSendsAction(t *testing.T) {
 	}
 }
 
+func TestHTTPClientNon2xx(t *testing.T) {
+	// A gateway returning valid JSON (no result/error) with a non-2xx status
+	// must surface as an error, not a false-healthy empty result.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		io.WriteString(w, `{"message":"gateway down"}`)
+	}))
+	defer srv.Close()
+
+	c := NewHTTPClient(srv.URL, "tok", 5*time.Second)
+	if _, err := c.Problems(context.Background()); err == nil {
+		t.Fatal("want error on HTTP 502 response, got nil")
+	}
+}
+
 func TestHTTPClientRPCError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, `{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"Invalid params","data":"boom"}}`)

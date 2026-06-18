@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -63,6 +65,11 @@ func (c *HTTPClient) call(ctx context.Context, method string, params interface{}
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("zabbix %s http %d: %s", method, resp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
 
 	var rpc rpcResponse
 	if err := json.NewDecoder(resp.Body).Decode(&rpc); err != nil {

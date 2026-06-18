@@ -14,6 +14,7 @@ type fakeClient struct {
 	problems []Problem
 	hosts    map[string]string
 	probErr  error
+	hostErr  error
 	ackCalls []ackCall
 }
 
@@ -27,7 +28,7 @@ func (f *fakeClient) Problems(ctx context.Context) ([]Problem, error) {
 	return f.problems, f.probErr
 }
 func (f *fakeClient) Hostnames(ctx context.Context, ids []string) (map[string]string, error) {
-	return f.hosts, nil
+	return f.hosts, f.hostErr
 }
 func (f *fakeClient) Acknowledge(ctx context.Context, ids []string, action int, msg string) error {
 	f.ackCalls = append(f.ackCalls, ackCall{ids, action, msg})
@@ -98,6 +99,23 @@ func TestHandleStatusZabbixDownDegrades(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"running":0`) || !strings.Contains(rec.Body.String(), `"data":[]`) {
 		t.Errorf("want running:0 + empty data: %s", rec.Body.String())
+	}
+}
+
+func TestHandleStatusHostnamesErrorDegrades(t *testing.T) {
+	c := &fakeClient{
+		problems: []Problem{{EventID: "1", TriggerID: "t1", Name: "x", Severity: 5, Clock: 100}},
+		hostErr:  context.DeadlineExceeded,
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	testServer(c).handleStatus(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"running":0`) || !strings.Contains(rec.Body.String(), `"data":[]`) {
+		t.Errorf("want running:0 + empty data on hostnames error: %s", rec.Body.String())
 	}
 }
 

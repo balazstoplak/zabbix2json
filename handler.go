@@ -54,19 +54,19 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Data:       []Service{},
 	}
 
-	problems, err := s.client.Problems(r.Context())
-	if err == nil {
-		env.Running = 1
+	// Only report running:1 with data when BOTH Zabbix calls succeed; any
+	// failure degrades to running:0 / empty data (spec §8), so the front-end
+	// never sees a partial snapshot (e.g. rows with blank hostnames).
+	if problems, err := s.client.Problems(r.Context()); err == nil {
 		triggerIDs := make([]string, 0, len(problems))
 		for _, p := range problems {
 			triggerIDs = append(triggerIDs, p.TriggerID)
 		}
-		hosts, herr := s.client.Hostnames(r.Context(), triggerIDs)
-		if herr != nil {
-			hosts = map[string]string{}
+		if hosts, herr := s.client.Hostnames(r.Context(), triggerIDs); herr == nil {
+			env.Running = 1
+			rows := BuildServices(problems, hosts, now.Unix())
+			env.Data = Filter(rows, statusTypes, serviceProps, hostProps)
 		}
-		rows := BuildServices(problems, hosts, now.Unix())
-		env.Data = Filter(rows, statusTypes, serviceProps, hostProps)
 	}
 
 	if jsonMode == 0 {

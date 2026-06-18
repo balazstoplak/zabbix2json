@@ -48,6 +48,16 @@ func (s *Server) handleCmd(w http.ResponseWriter, r *http.Request) {
 		writeAck(w, http.StatusBadRequest, ackResponse{false, "unsupported cmd_typ"})
 		return
 	}
+	if host == "" {
+		writeAck(w, http.StatusBadRequest, ackResponse{false, "host required"})
+		return
+	}
+	// Service-level commands require a service name; a blank one must not
+	// fall through to matching every problem on the host.
+	if (cmdTyp == 34 || cmdTyp == 52) && service == "" {
+		writeAck(w, http.StatusBadRequest, ackResponse{false, "service required"})
+		return
+	}
 
 	problems, err := s.client.Problems(r.Context())
 	if err != nil {
@@ -58,7 +68,11 @@ func (s *Server) handleCmd(w http.ResponseWriter, r *http.Request) {
 	for _, p := range problems {
 		triggerIDs = append(triggerIDs, p.TriggerID)
 	}
-	hosts, _ := s.client.Hostnames(r.Context(), triggerIDs)
+	hosts, herr := s.client.Hostnames(r.Context(), triggerIDs)
+	if herr != nil {
+		writeAck(w, http.StatusBadGateway, ackResponse{false, "zabbix unavailable"})
+		return
+	}
 	rows := BuildServices(problems, hosts, 0)
 
 	var eventIDs []string
