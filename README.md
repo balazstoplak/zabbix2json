@@ -31,7 +31,72 @@ version: 20110619                              # value echoed in the "version" f
 Environment variables override the file: `ZABBIX_URL`, `ZABBIX_TOKEN`,
 `LISTEN_ADDR`, `ZABBIX_TIMEOUT`. `url` and `token` are required.
 
-Create the token in Zabbix under *Users → API tokens*.
+Zabbix 7.0 setup (user, role, permissions, token)
+--------------------------------------------------
+zabbix2json authenticates with a single **API token** bound to a dedicated
+Zabbix user. That user needs three things: **read** access to the host groups
+you want to surface, an API-enabled **role**, and — for the acknowledge feature —
+the role's acknowledge/comment actions. Everything below is done as a *Super
+admin*.
+
+The methods used are `problem.get`, `trigger.get`, and `event.acknowledge`. None
+of them require *write* access: zabbix2json only acknowledges, adds a comment, and
+unacknowledges (it never closes problems or changes severity), so **read**
+permission on the host groups is sufficient.
+
+### 1. Create a role (`Users → Roles → Create role`)
+
+- **User type:** `User` is enough.
+- **Access to API:** check **Enabled**. Optionally set **API methods** to an
+  *allow list* and restrict it to exactly:
+  `problem.get`, `trigger.get`, `event.acknowledge`.
+- **Access to actions** (only needed for the `cmd.cgi` ack endpoint): enable
+  **Acknowledge problems** and **Add problem comments**. Leave *Close problems*,
+  *Change severity*, and *Suppress problems* off — they are not used.
+
+Name it e.g. `zabbix2json role`.
+
+### 2. Create a user group with read permission (`Users → User groups → Create user group`)
+
+Host-group permissions in Zabbix are granted through **user groups**, not roles.
+
+- Name it e.g. `zabbix2json`.
+- On the **Host permissions** tab, add the host group(s) you want exposed with
+  permission level **Read** (use a parent group with *Include subgroups* to cover
+  everything).
+
+### 3. Create the user (`Users → Users → Create user`)
+
+- **Username:** e.g. `zabbix2json`.
+- **Groups:** the `zabbix2json` user group from step 2.
+- **Role** (Permissions tab): the `zabbix2json role` from step 1.
+- A password is required by the form but is unused — the service authenticates
+  only with the token.
+
+### 4. Create the API token (`Users → API tokens → Create API token`)
+
+- **Name:** e.g. `zabbix2json`.
+- **User:** select the `zabbix2json` user.
+- **Set expiration date and time:** uncheck for a non-expiring token (or set one
+  and rotate it).
+- **Enabled:** checked.
+- Press **Add**, then **copy the _Auth token_ value immediately** — Zabbix shows
+  it only once and it cannot be retrieved later.
+
+Put that value in `token:` (or `ZABBIX_TOKEN`) and set `url:` to your
+`…/api_jsonrpc.php` endpoint.
+
+### Verify
+
+```sh
+curl -s -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"problem.get","params":{"limit":1},"id":1}' \
+  -H "Authorization: Bearer <token>" \
+  https://zbx.example/api_jsonrpc.php
+```
+A JSON-RPC `result` array confirms the token and permissions work; an `error`
+about access usually means the user group lacks read permission on the host
+group, or the role has API disabled.
 
 Status endpoint — `GET /`
 -------------------------
