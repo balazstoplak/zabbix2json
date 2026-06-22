@@ -1,8 +1,13 @@
 name: release
 
 on:
-  push:
+  # Rolling 'latest' release: runs only AFTER the build workflow succeeds on main.
+  workflow_run:
+    workflows: ["build"]
     branches: [main]
+    types: [completed]
+  # Stable releases from version tags (build.yml does not run on tags — no overlap).
+  push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -15,20 +20,19 @@ permissions:
 
 jobs:
   release:
+    # For the rolling path, only proceed if the build actually passed.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.inputs.tag || github.ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Test
-        run: go test ./...
 
       - name: Build binaries
         run: |
@@ -46,14 +50,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
-            # Push to main → refresh the rolling 'latest' release (no tag needed).
-            echo "Publishing rolling 'latest' release at ${GITHUB_SHA:0:7}"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # main passed CI → refresh the rolling 'latest' release at the built commit.
+            SHA="${{ github.event.workflow_run.head_sha }}"
+            echo "Publishing rolling 'latest' release at ${SHA:0:7}"
             gh release delete latest --yes --cleanup-tag 2>/dev/null || true
             gh release create latest dist/* \
-              --target "$GITHUB_SHA" \
+              --target "$SHA" \
               --title "latest (continuous build)" \
-              --notes "Rolling build from \`main\` @ ${GITHUB_SHA:0:7}, updated on every push to main." \
+              --notes "Rolling build from \`main\` @ ${SHA:0:7}, updated on every push to main." \
               --latest
           else
             # Tag push or manual dispatch → stable, named release with notes.
