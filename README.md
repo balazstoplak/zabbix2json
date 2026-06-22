@@ -1,6 +1,8 @@
 zabbix2json
 ===========
 
+[![build](https://github.com/balazstoplak/zabbix2json/actions/workflows/build.yml/badge.svg)](https://github.com/balazstoplak/zabbix2json/actions/workflows/build.yml)
+
 Serves the [nagios2json](https://github.com/macskas/nagios2json) JSON wire
 format, but sourced live from the **Zabbix 7.0 API** instead of a Nagios
 `status.dat` file. Drop it behind your existing Nagios aggregator front-end and
