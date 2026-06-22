@@ -2,11 +2,12 @@ name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (e.g. v1.0.0). The tag must already exist."
+        description: "Existing tag to (re)release (e.g. v1.0.0)"
         required: true
 
 permissions:
@@ -26,6 +27,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Test
+        run: go test ./...
+
       - name: Build binaries
         run: |
           mkdir -p dist
@@ -39,8 +43,25 @@ jobs:
           cd dist && sha256sum zabbix2json-* > sha256sums.txt
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
-          files: dist/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
+            # Push to main → refresh the rolling 'latest' release (no tag needed).
+            echo "Publishing rolling 'latest' release at ${GITHUB_SHA:0:7}"
+            gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+            gh release create latest dist/* \
+              --target "$GITHUB_SHA" \
+              --title "latest (continuous build)" \
+              --notes "Rolling build from \`main\` @ ${GITHUB_SHA:0:7}, updated on every push to main." \
+              --latest
+          else
+            # Tag push or manual dispatch → stable, named release with notes.
+            TAG="${{ github.event.inputs.tag || github.ref_name }}"
+            echo "Publishing stable release $TAG"
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release upload "$TAG" dist/* --clobber
+            else
+              gh release create "$TAG" dist/* --title "$TAG" --generate-notes --latest
+            fi
+          fi
