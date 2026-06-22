@@ -18,6 +18,17 @@ go build -o zabbix2json
 ```
 Single binary, one dependency (`gopkg.in/yaml.v3`).
 
+### Prebuilt binaries
+
+Each version tag (`v*`) publishes prebuilt Linux binaries to
+[Releases](https://github.com/balazstoplak/zabbix2json/releases)
+(`zabbix2json-linux-amd64`, `zabbix2json-linux-arm64`, plus `sha256sums.txt`):
+
+```sh
+curl -fsSLO https://github.com/balazstoplak/zabbix2json/releases/latest/download/zabbix2json-linux-amd64
+chmod +x zabbix2json-linux-amd64
+```
+
 Configuration
 -------------
 Pass `-config /path/to/zabbix2json.yaml` (default `/etc/zabbix2json.yaml`):
