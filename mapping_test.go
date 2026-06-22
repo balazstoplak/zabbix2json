@@ -64,10 +64,27 @@ func TestServiceFlags(t *testing.T) {
 }
 
 func TestHostFlags(t *testing.T) {
-	if HostFlags(true)&HostScheduledDowntime == 0 {
+	if HostFlags(false, true)&HostScheduledDowntime == 0 {
 		t.Error("expected HostScheduledDowntime when suppressed")
 	}
-	if HostFlags(false)&HostNoScheduledDowntime == 0 {
+	if HostFlags(false, false)&HostNoScheduledDowntime == 0 {
 		t.Error("expected HostNoScheduledDowntime when not suppressed")
+	}
+	if HostFlags(true, false)&HostStateAcknowledged == 0 {
+		t.Error("expected HostStateAcknowledged when acknowledged")
+	}
+	if HostFlags(false, false)&HostStateUnacknowledged == 0 {
+		t.Error("expected HostStateUnacknowledged when not acknowledged")
+	}
+}
+
+// Regression: the aggregator's standard host filter 262154
+// (HARD | UNACKNOWLEDGED | NO_DOWNTIME) must match an unacknowledged,
+// non-suppressed problem's host flags.
+func TestHostFlagsMatchAggregatorHostprops(t *testing.T) {
+	const hostprops = HostHardState | HostStateUnacknowledged | HostNoScheduledDowntime // 262154
+	hf := HostFlags(false, false)
+	if hf&hostprops != hostprops {
+		t.Errorf("host flags %d do not satisfy hostprops %d (& = %d)", hf, hostprops, hf&hostprops)
 	}
 }

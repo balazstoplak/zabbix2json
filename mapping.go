@@ -73,8 +73,15 @@ func ServiceFlags(acknowledged, suppressed bool) int {
 }
 
 // HostFlags builds the nagios host flags bitmask from Zabbix signals.
-func HostFlags(suppressed bool) int {
+// The host ack state mirrors the problem's ack state, so the nagios aggregator's
+// standard hostprops filter (e.g. 262154 = HARD|UNACKNOWLEDGED|NO_DOWNTIME) works.
+func HostFlags(acknowledged, suppressed bool) int {
 	flags := HostChecksEnabled | HostNotificationsEnabled | HostActiveCheck | HostHardState
+	if acknowledged {
+		flags |= HostStateAcknowledged
+	} else {
+		flags |= HostStateUnacknowledged
+	}
 	if suppressed {
 		flags |= HostScheduledDowntime
 	} else {
@@ -100,7 +107,7 @@ func BuildServices(problems []Problem, hostByTrigger map[string]string, now int6
 			Service:         p.Name,
 			Status:          SeverityToStatus(p.Severity),
 			Flags:           ServiceFlags(p.Acknowledged, p.Suppressed),
-			HostFlags:       HostFlags(p.Suppressed),
+			HostFlags:       HostFlags(p.Acknowledged, p.Suppressed),
 			LastStateChange: p.Clock,
 			DurationSecs:    now - p.Clock,
 			PluginOutput:    output,

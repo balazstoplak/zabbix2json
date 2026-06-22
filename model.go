@@ -26,6 +26,8 @@ const (
 const (
 	HostScheduledDowntime    = 1
 	HostNoScheduledDowntime  = 2
+	HostStateAcknowledged    = 4
+	HostStateUnacknowledged  = 8
 	HostChecksEnabled        = 32
 	HostNotificationsEnabled = 8192
 	HostActiveCheck          = 131072
