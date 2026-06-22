@@ -95,6 +95,10 @@ func BuildServices(problems []Problem, hostByTrigger map[string]string, now int6
 	totals := make(map[string]int, len(problems))
 	rows := make([]Service, 0, len(problems))
 	for _, p := range problems {
+		// Not classified (0) and Information (1) severities are always excluded.
+		if p.Severity < 2 {
+			continue
+		}
 		host := hostByTrigger[p.TriggerID]
 		totals[host]++
 		output := p.Opdata

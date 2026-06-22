@@ -45,7 +45,7 @@ func TestHandleStatusDefaultFilter(t *testing.T) {
 	c := &fakeClient{
 		problems: []Problem{
 			{EventID: "1", TriggerID: "t1", Name: "Crit", Severity: 5, Clock: 100},
-			{EventID: "2", TriggerID: "t2", Name: "Info", Severity: 1, Clock: 100}, // UNKNOWN, still in default 28
+			{EventID: "2", TriggerID: "t2", Name: "Info", Severity: 1, Clock: 100}, // Information: always excluded
 		},
 		hosts: map[string]string{"t1": "h1", "t2": "h2"},
 	}
@@ -66,8 +66,9 @@ func TestHandleStatusDefaultFilter(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 		t.Fatalf("bad json: %v\n%s", err, rec.Body.String())
 	}
-	if env.Running != 1 || len(env.Data) != 2 {
-		t.Fatalf("want running=1, 2 rows; got %+v", env)
+	// Only the severity-5 problem remains; the Information one is filtered out.
+	if env.Running != 1 || len(env.Data) != 1 || env.Data[0].Hostname != "h1" {
+		t.Fatalf("want running=1, 1 row (h1); got %+v", env)
 	}
 }
 

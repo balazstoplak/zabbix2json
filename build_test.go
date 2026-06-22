@@ -32,6 +32,30 @@ func TestBuildServicesJoinsAndCounts(t *testing.T) {
 	}
 }
 
+func TestBuildServicesDropsNotClassifiedAndInformation(t *testing.T) {
+	problems := []Problem{
+		{EventID: "1", TriggerID: "t1", Name: "NotClassified", Severity: 0, Clock: 10},
+		{EventID: "2", TriggerID: "t2", Name: "Info", Severity: 1, Clock: 10},
+		{EventID: "3", TriggerID: "t3", Name: "Warn", Severity: 2, Clock: 10},
+		{EventID: "4", TriggerID: "t4", Name: "Disaster", Severity: 5, Clock: 10},
+	}
+	hosts := map[string]string{"t1": "h", "t2": "h", "t3": "h", "t4": "h"}
+	rows := BuildServices(problems, hosts, 100)
+
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows (severity >= 2), got %d", len(rows))
+	}
+	for _, r := range rows {
+		if r.Service == "NotClassified" || r.Service == "Info" {
+			t.Errorf("severity 0/1 row leaked through: %q", r.Service)
+		}
+	}
+	// dropped problems must not inflate services_total either
+	if rows[0].ServicesTotal != 2 {
+		t.Errorf("services_total should exclude dropped problems, got %d", rows[0].ServicesTotal)
+	}
+}
+
 func TestBuildServicesMissingHost(t *testing.T) {
 	rows := BuildServices([]Problem{{EventID: "1", TriggerID: "x", Name: "n", Severity: 5, Clock: 10}}, map[string]string{}, 20)
 	if rows[0].Hostname != "" || rows[0].ServicesTotal != 1 {
