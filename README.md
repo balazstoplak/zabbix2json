@@ -142,7 +142,12 @@ Severity mapping
 |-----------------|---------------|
 | 5 Disaster, 4 High | `CRITICAL` |
 | 3 Average, 2 Warning | `WARNING` |
-| 1 Information, 0 Not classified | `UNKNOWN` |
+| 1 Information, 0 Not classified | *excluded* (never shown) |
+
+Problems of severity **Not classified (0)** and **Information (1)** are always
+filtered out — they never appear in `data` regardless of `servicestatustypes`,
+and are not counted in `services_total`. So the output only ever contains
+`WARNING` and `CRITICAL` rows.
 
 Acknowledge endpoint — `cmd.cgi`
 --------------------------------
@@ -172,6 +177,9 @@ Limitations (by design)
 - **Active problems only.** Rows come from Zabbix `problem.get`, so `OK` and
   `PENDING` rows are never produced — requesting `servicestatustypes=2` returns
   nothing.
+- **Low severities are always excluded.** Not classified (0) and Information (1)
+  problems are dropped, so `UNKNOWN` rows are never produced either; only
+  `WARNING` and `CRITICAL` appear.
 - **`host_alive` is always `1`.** Zabbix 7.0 has no single host ping-state
   (availability is per-interface).
 - The Nagios `sticky`, `persistent`, and `send_notification` ack parameters have

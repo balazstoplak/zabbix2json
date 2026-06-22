@@ -25,7 +25,7 @@ Design priorities, in order: **drop-in output compatibility**, **simplicity**,
 |----------|--------|-----------|
 | Row mapping | One row per **active Zabbix problem** (`problem.get`) | Matches the aggregator/dashboard use case |
 | List scope | **Active problems only** | OK/PENDING rows are never producible; accepted trade-off |
-| Severity map | Disaster/High→CRITICAL, Average/Warning→WARNING, Info/NotClassified→UNKNOWN | Matches ops intuition |
+| Severity map | Disaster/High→CRITICAL, Average/Warning→WARNING; Info/NotClassified always excluded | Matches ops intuition; low severities are noise |
 | Language | **Go** | Single static binary, fast stdlib HTTP+JSON, easy deploy |
 | Serving model | **Pure proxy** — every request queries Zabbix live, no cache | Simplest; always live |
 | Ack interface | **Nagios `cmd.cgi`-compatible** | Frontend needs zero changes |
@@ -126,9 +126,15 @@ Two Zabbix API calls per request (problem.get + one batched trigger.get).
 |-----------------|---------------|-----|
 | 5 Disaster, 4 High | `CRITICAL` | 16 |
 | 3 Average, 2 Warning | `WARNING` | 4 |
-| 1 Information, 0 Not classified | `UNKNOWN` | 8 |
+| 1 Information, 0 Not classified | *excluded* | — |
 
-(`OK`=2 and `PENDING`=1 are never produced — see §2 list scope.)
+Problems of severity Not classified (0) and Information (1) are **always
+excluded**: they are dropped in `BuildServices` before a row is created, so they
+never appear regardless of `servicestatustypes` and are not counted in
+`services_total`. Consequently `UNKNOWN` is never produced either — the output
+only ever contains `WARNING` and `CRITICAL` rows.
+
+(`OK`=2 and `PENDING`=1 are likewise never produced — see §2 list scope.)
 
 ### 6.2 Row fields
 
