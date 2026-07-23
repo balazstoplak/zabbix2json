@@ -90,6 +90,14 @@ func HostFlags(acknowledged, suppressed bool) int {
 	return flags
 }
 
+// phantomHealthyServices pads services_total above the number of actual
+// problems on a host. Zabbix has no concept of "total services" per host, so
+// every row we emit is a down service and services_visible would always equal
+// services_total. A status UI aggregates that to "all services down" on every
+// host. Reporting a higher total keeps that aggregation from triggering; the
+// exact value is not meaningful (there is no real total to report).
+const phantomHealthyServices = 8
+
 // BuildServices joins problems to their hostnames and produces nagios rows.
 func BuildServices(problems []Problem, hostByTrigger map[string]string, now int64) []Service {
 	totals := make(map[string]int, len(problems))
@@ -119,7 +127,7 @@ func BuildServices(problems []Problem, hostByTrigger map[string]string, now int6
 		})
 	}
 	for i := range rows {
-		rows[i].ServicesTotal = totals[rows[i].Hostname]
+		rows[i].ServicesTotal = totals[rows[i].Hostname] + phantomHealthyServices
 	}
 	return rows
 }

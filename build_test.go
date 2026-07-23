@@ -20,8 +20,8 @@ func TestBuildServicesJoinsAndCounts(t *testing.T) {
 	if r0.PluginOutput != "load 9.1" || r0.DurationSecs != 900 || r0.HostAlive != 1 {
 		t.Errorf("row0 derived fields wrong: %+v", r0)
 	}
-	if r0.ServicesTotal != 2 {
-		t.Errorf("row0 ServicesTotal want 2, got %d", r0.ServicesTotal)
+	if r0.ServicesTotal != 2+phantomHealthyServices {
+		t.Errorf("row0 ServicesTotal want %d, got %d", 2+phantomHealthyServices, r0.ServicesTotal)
 	}
 	r1 := rows[1]
 	if r1.PluginOutput != "Disk low" { // opdata empty -> falls back to name
@@ -51,14 +51,14 @@ func TestBuildServicesDropsNotClassifiedAndInformation(t *testing.T) {
 		}
 	}
 	// dropped problems must not inflate services_total either
-	if rows[0].ServicesTotal != 2 {
+	if rows[0].ServicesTotal != 2+phantomHealthyServices {
 		t.Errorf("services_total should exclude dropped problems, got %d", rows[0].ServicesTotal)
 	}
 }
 
 func TestBuildServicesMissingHost(t *testing.T) {
 	rows := BuildServices([]Problem{{EventID: "1", TriggerID: "x", Name: "n", Severity: 5, Clock: 10}}, map[string]string{}, 20)
-	if rows[0].Hostname != "" || rows[0].ServicesTotal != 1 {
+	if rows[0].Hostname != "" || rows[0].ServicesTotal != 1+phantomHealthyServices {
 		t.Errorf("missing-host handling wrong: %+v", rows[0])
 	}
 }

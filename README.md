@@ -149,6 +149,13 @@ filtered out — they never appear in `data` regardless of `servicestatustypes`,
 and are not counted in `services_total`. So the output only ever contains
 `WARNING` and `CRITICAL` rows.
 
+`services_total` is the per-host problem count **plus a fixed padding** of
+phantom healthy services. Zabbix has no notion of "total services" on a host,
+so without the padding every emitted row would be a down service and
+`services_visible` would always equal `services_total` — which a status UI
+aggregates into a misleading "all services down". The padding keeps that
+aggregation from firing; the value is not a real service count.
+
 Acknowledge endpoint — `cmd.cgi`
 --------------------------------
 Accepts the Nagios `cmd.cgi` parameters and translates them into Zabbix
