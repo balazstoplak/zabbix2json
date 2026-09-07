@@ -149,6 +149,24 @@ filtered out — they never appear in `data` regardless of `servicestatustypes`,
 and are not counted in `services_total`. So the output only ever contains
 `WARNING` and `CRITICAL` rows.
 
+Excluded problems
+-----------------
+Beyond the severity rule above, a problem is left out of `data` whenever Zabbix
+would also hide it in *Monitoring → Problems*. The trigger lookup is made with
+`monitored: true` and `skipDependent: true` — the two filters the frontend
+itself applies — so these never appear:
+
+- the trigger is **disabled** (including a discovered trigger disabled after
+  LLD lost its resource — such problems stay in Zabbix's `problem` table
+  indefinitely and never resolve);
+- the trigger's **host is disabled or not monitored**;
+- the trigger **depends on another trigger currently in a problem state**; the
+  parent problem is still reported, so the cause is never silently dropped.
+
+Excluded problems are not counted in `services_total` either. Note that
+`problem.get` on its own *does* return all of the above, which is why a raw API
+query can show problems the dashboard does not.
+
 `services_total` is the per-host problem count **plus a fixed padding** of
 phantom healthy services. Zabbix has no notion of "total services" on a host,
 so without the padding every emitted row would be a down service and
