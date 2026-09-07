@@ -56,9 +56,25 @@ func TestBuildServicesDropsNotClassifiedAndInformation(t *testing.T) {
 	}
 }
 
-func TestBuildServicesMissingHost(t *testing.T) {
-	rows := BuildServices([]Problem{{EventID: "1", TriggerID: "x", Name: "n", Severity: 5, Clock: 10}}, map[string]string{}, 20)
-	if rows[0].Hostname != "" || rows[0].ServicesTotal != 1+phantomHealthyServices {
-		t.Errorf("missing-host handling wrong: %+v", rows[0])
+// A trigger missing from the map was withheld by trigger.get as disabled,
+// unmonitored or dependency-suppressed. Such a problem is dropped entirely: it
+// used to be emitted as a row with an empty hostname, which no host in the
+// aggregator could own.
+func TestBuildServicesDropsProblemsWithoutVisibleTrigger(t *testing.T) {
+	problems := []Problem{
+		{EventID: "1", TriggerID: "t1", Name: "visible", Severity: 5, Clock: 10},
+		{EventID: "2", TriggerID: "gone", Name: "disabled trigger", Severity: 5, Clock: 10},
+	}
+	rows := BuildServices(problems, map[string]string{"t1": "web01"}, 20)
+
+	if len(rows) != 1 {
+		t.Fatalf("want 1 row, got %d: %+v", len(rows), rows)
+	}
+	if rows[0].Service != "visible" || rows[0].Hostname != "web01" {
+		t.Errorf("wrong row survived: %+v", rows[0])
+	}
+	// the dropped problem must not inflate services_total either
+	if want := 1 + phantomHealthyServices; rows[0].ServicesTotal != want {
+		t.Errorf("services_total %d, want %d", rows[0].ServicesTotal, want)
 	}
 }

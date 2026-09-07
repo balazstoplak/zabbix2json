@@ -134,15 +134,22 @@ type rawTrigger struct {
 	} `json:"hosts"`
 }
 
+// Hostnames resolves trigger IDs to host names and doubles as the visibility
+// set: monitored + skipDependent are the same two filters Monitoring ->
+// Problems applies, so a trigger that is disabled, sits on a disabled or
+// unmonitored host, or depends on a trigger already in PROBLEM state is absent
+// from the returned map. Callers must treat absence as "do not report".
 func (c *HTTPClient) Hostnames(ctx context.Context, triggerIDs []string) (map[string]string, error) {
 	out := make(map[string]string, len(triggerIDs))
 	if len(triggerIDs) == 0 {
 		return out, nil
 	}
 	params := map[string]interface{}{
-		"output":      []string{"triggerid"},
-		"triggerids":  triggerIDs,
-		"selectHosts": []string{"name"},
+		"output":        []string{"triggerid"},
+		"triggerids":    triggerIDs,
+		"selectHosts":   []string{"name"},
+		"monitored":     true,
+		"skipDependent": true,
 	}
 	var raw []rawTrigger
 	if err := c.call(ctx, "trigger.get", params, &raw); err != nil {

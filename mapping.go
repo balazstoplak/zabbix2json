@@ -107,7 +107,13 @@ func BuildServices(problems []Problem, hostByTrigger map[string]string, now int6
 		if p.Severity < 2 {
 			continue
 		}
-		host := hostByTrigger[p.TriggerID]
+		// A trigger absent from the map is one Zabbix withheld as disabled,
+		// unmonitored or dependency-suppressed; the dashboard hides those
+		// problems, so we drop them instead of emitting a hostname-less row.
+		host, ok := hostByTrigger[p.TriggerID]
+		if !ok {
+			continue
+		}
 		totals[host]++
 		output := p.Opdata
 		if output == "" {

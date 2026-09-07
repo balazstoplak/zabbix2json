@@ -68,6 +68,34 @@ func TestHTTPClientHostnames(t *testing.T) {
 	}
 }
 
+// Hostnames doubles as the visibility set: the trigger.get call must apply the
+// same two filters Monitoring -> Problems does, so triggers that are disabled,
+// sit on an unmonitored host, or depend on a trigger already in PROBLEM state
+// never make it into the map.
+func TestHTTPClientHostnamesFiltersLikeFrontend(t *testing.T) {
+	var captured rpcReq
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &captured)
+		io.WriteString(w, `{"jsonrpc":"2.0","id":1,"result":[]}`)
+	}))
+	defer srv.Close()
+
+	c := NewHTTPClient(srv.URL, "tok", 5*time.Second)
+	if _, err := c.Hostnames(context.Background(), []string{"t9"}); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != "trigger.get" {
+		t.Errorf("method: %q", captured.Method)
+	}
+	if captured.Params["monitored"] != true {
+		t.Errorf("monitored param: %v (want true)", captured.Params["monitored"])
+	}
+	if captured.Params["skipDependent"] != true {
+		t.Errorf("skipDependent param: %v (want true)", captured.Params["skipDependent"])
+	}
+}
+
 func TestHTTPClientAcknowledgeSendsAction(t *testing.T) {
 	var captured rpcReq
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

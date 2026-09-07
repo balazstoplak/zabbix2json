@@ -72,6 +72,44 @@ func TestHandleStatusDefaultFilter(t *testing.T) {
 	}
 }
 
+// A trigger missing from the hostname map is one Zabbix withheld because it is
+// disabled, its host is unmonitored, or it depends on a trigger already in
+// PROBLEM state. Such problems must not be emitted at all -- previously they
+// produced a row with an empty hostname -- and must not inflate services_total.
+func TestHandleStatusDropsProblemsWithoutVisibleTrigger(t *testing.T) {
+	c := &fakeClient{
+		problems: []Problem{
+			{EventID: "1", TriggerID: "t1", Name: "Crit", Severity: 5, Clock: 100},
+			{EventID: "2", TriggerID: "t2", Name: "Disabled", Severity: 5, Clock: 100},
+		},
+		hosts: map[string]string{"t1": "h1"}, // t2 withheld by trigger.get
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	testServer(c).handleStatus(rec, req)
+
+	var env struct {
+		Data []struct {
+			Hostname      string `json:"hostname"`
+			Service       string `json:"service"`
+			ServicesTotal int    `json:"services_total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+		t.Fatalf("bad json: %v\n%s", err, rec.Body.String())
+	}
+	if len(env.Data) != 1 {
+		t.Fatalf("want 1 row, got %d: %s", len(env.Data), rec.Body.String())
+	}
+	if env.Data[0].Hostname != "h1" || env.Data[0].Service != "Crit" {
+		t.Errorf("wrong row survived: %+v", env.Data[0])
+	}
+	if want := 1 + phantomHealthyServices; env.Data[0].ServicesTotal != want {
+		t.Errorf("services_total %d, want %d (dropped problem must not count)",
+			env.Data[0].ServicesTotal, want)
+	}
+}
+
 func TestHandleStatusServicestatustypesFilter(t *testing.T) {
 	c := &fakeClient{
 		problems: []Problem{
